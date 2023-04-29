@@ -4,13 +4,6 @@
 
 #include "cutest.h"
 
-/**
- * Maps cu_assert_type to strings.
- */
-static char const *const assert_type_str[] = {
-    "Equal",
-    "True"};
-
 struct cu_test_case
 {
     CuTestCase *next;
@@ -18,11 +11,10 @@ struct cu_test_case
     char const *name;
     struct fail_info
     {
-        char const *arg1;
-        char const *arg2;
+        CuAssertArg arg1, arg2;
         char const *file;
         int line;
-        enum cu_assert_type type;
+        CuAssertType type;
     } fail_info;
     int failed;
 };
@@ -69,19 +61,38 @@ void cu_add_test(CuTestSuite *suite, CuTestCase *tc)
     suite->tail = tc;
 }
 
-void cu_set_failed(
-    CuTestCase *tc, enum cu_assert_type type,
-    char const *file, int line,
-    char const *arg1, char const *arg2)
+int cu_do_assertion(
+    CuTestCase *tc, CuAssertType type,
+    CuAssertArg *arg1, CuAssertArg *arg2,
+    char const *file, int line)
 {
-    struct fail_info *info = &tc->fail_info;
+    int result;
 
-    info->arg1 = arg1;
-    info->arg2 = arg2;
-    info->file = file;
-    info->line = line;
-    info->type = type;
-    tc->failed = 1;
+    switch (type)
+    {
+    case CU_ASSERT_EQUAL:
+        result = arg1->value.i == arg2->value.i;
+        break;
+    case CU_ASSERT_TRUE:
+        result = arg1->value.i;
+        break;
+    default:
+        break;
+    }
+
+    if (!result)
+    {
+        struct fail_info *info = &tc->fail_info;
+
+        info->arg1 = *arg1;
+        info->arg2 = *arg2;
+        info->file = file;
+        info->line = line;
+        info->type = type;
+        tc->failed = 1;
+    }
+
+    return result;
 }
 
 void cu_run_tests(CuTestSuite *suite)
@@ -107,13 +118,21 @@ void cu_print_results(CuTestSuite *suite, FILE *out)
             if (tc->failed)
             {
                 struct fail_info const *info = &tc->fail_info;
-                char const *suffix = assert_type_str[info->type];
 
-                fprintf(out, "FAIL: %s\n", tc->name);
-                if (info->arg2 != NULL)
-                    fprintf(out, "\tAssert%s(%s, %s)\n", suffix, info->arg1, info->arg2);
-                else
-                    fprintf(out, "\tAssert%s(%s)\n", suffix, info->arg1);
+                fprintf(out, "FAIL: %s, %s:%d\n", tc->name, info->file, info->line);
+                switch (info->type)
+                {
+                case CU_ASSERT_EQUAL:
+                    fprintf(out, "\tAssertEqual(%s, %s)\n", info->arg1.expr, info->arg2.expr);
+                    fprintf(out, "\t%d != %d\n", info->arg1.value.i, info->arg2.value.i);
+                    break;
+                case CU_ASSERT_TRUE:
+                    fprintf(out, "\tAssertTrue(%s)\n", info->arg1.expr);
+                    fprintf(out, "\t%d is not true\n", info->arg1.value.i);
+                    break;
+                default:
+                    break;
+                }
             }
         }
     }

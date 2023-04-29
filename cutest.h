@@ -7,19 +7,21 @@
     cu_add_test(suite, cu_new_test_case(func, #func))
 
 #define AssertTrue(tc, expr) \
-    CuAssert((tc), CU_ASSERT_TRUE, #expr, NULL, (expr))
+    CuAssert(tc, CU_ASSERT_TRUE, expr, 0, i)
 
 #define AssertEqual(tc, first, second) \
-    CuAssert((tc), CU_ASSERT_EQUAL, #first, #second, (first) == (second))
+    CuAssert(tc, CU_ASSERT_EQUAL, first, second, i)
 
-#define CuAssert(tc, type, arg1, arg2, expr)                                 \
-    do                                                                       \
-    {                                                                        \
-        if (!(expr))                                                         \
-        {                                                                    \
-            cu_set_failed((tc), (type), __FILE__, __LINE__, (arg1), (arg2)); \
-            return;                                                          \
-        }                                                                    \
+#define CuAssert(tc, type, expr1, expr2, X)                               \
+    do                                                                    \
+    {                                                                     \
+        CuAssertArg arg1, arg2;                                           \
+        arg1.expr = #expr1;                                               \
+        arg2.expr = #expr2;                                               \
+        arg1.value.X = expr1;                                             \
+        arg2.value.X = expr2;                                             \
+        if (!cu_do_assertion(tc, type, &arg1, &arg2, __FILE__, __LINE__)) \
+            return;                                                       \
     } while (0)
 
 /**
@@ -35,11 +37,26 @@ typedef struct cu_test_suite CuTestSuite;
 /**
  * All possible assertion types.
  */
-enum cu_assert_type
+typedef enum
 {
     CU_ASSERT_EQUAL,
     CU_ASSERT_TRUE
-};
+} CuAssertType;
+
+/**
+ * Represents an argument passed to an assertion function.
+ */
+typedef struct
+{
+    /* The argument's original string representation */
+    char const *expr;
+    /* The argument's actual value */
+    union cu_value
+    {
+        void const *p;
+        int i;
+    } value;
+} CuAssertArg;
 
 /**
  * Create a new test suite.
@@ -57,13 +74,15 @@ extern CuTestCase *cu_new_test_case(void (*func)(CuTestCase *), char const *name
 extern void cu_add_test(CuTestSuite *suite, CuTestCase *tc);
 
 /**
- * Denote the test case as failing and update the corresponding failure
- * information.
+ * Perform the assertion check.
+ *
+ * If the assertion fails, then the test case is updated as such and 0 is
+ * returned.
  */
-extern void cu_set_failed(
-    CuTestCase *tc, enum cu_assert_type type,
-    char const *file, int line,
-    char const *arg1, char const *arg2);
+extern int cu_do_assertion(
+    CuTestCase *tc, CuAssertType type,
+    CuAssertArg *arg1, CuAssertArg *arg2,
+    char const *file, int line);
 
 /**
  * Run all tests in the test suite.
