@@ -6,11 +6,29 @@
 #define AddTestCase(suite, func) \
     cu_add_test(suite, cu_new_test_case(func, #func))
 
+#define AssertEqual(tc, first, second) \
+    CuAssert(tc, CU_ASSERT_EQUAL, first, second, i)
+
+#define AssertNotEqual(tc, first, second) \
+    CuAssert(tc, CU_ASSERT_NOT_EQUAL, first, second, i)
+
+#define AssertStrEqual(tc, first, second) \
+    CuAssert(tc, CU_ASSERT_STR_EQUAL, first, second, s)
+
+#define AssertStrNotEqual(tc, first, second) \
+    CuAssert(tc, CU_ASSERT_STR_NOT_EQUAL, first, second, s)
+
 #define AssertTrue(tc, expr) \
     CuAssert(tc, CU_ASSERT_TRUE, expr, 0, i)
 
-#define AssertEqual(tc, first, second) \
-    CuAssert(tc, CU_ASSERT_EQUAL, first, second, i)
+#define AssertFalse(tc, expr) \
+    CuAssert(tc, CU_ASSERT_FALSE, expr, 0, i)
+
+#define AssertNull(tc, ptr) \
+    CuAssert(tc, CU_ASSERT_NULL, ptr, 0, p)
+
+#define AssertNotNull(tc, ptr) \
+    CuAssert(tc, CU_ASSERT_NOT_NULL, ptr, 0, p)
 
 #define CuAssert(tc, type, expr1, expr2, X)                               \
     do                                                                    \
@@ -40,7 +58,13 @@ typedef struct cu_test_suite CuTestSuite;
 typedef enum
 {
     CU_ASSERT_EQUAL,
-    CU_ASSERT_TRUE
+    CU_ASSERT_NOT_EQUAL,
+    CU_ASSERT_STR_EQUAL,
+    CU_ASSERT_STR_NOT_EQUAL,
+    CU_ASSERT_TRUE,
+    CU_ASSERT_FALSE,
+    CU_ASSERT_NULL,
+    CU_ASSERT_NOT_NULL
 } CuAssertType;
 
 /**
@@ -54,6 +78,7 @@ typedef struct
     union cu_value
     {
         void const *p;
+        char const *s;
         int i;
     } value;
 } CuAssertArg;
@@ -81,7 +106,7 @@ extern void cu_add_test(CuTestSuite *suite, CuTestCase *tc);
  */
 extern int cu_do_assertion(
     CuTestCase *tc, CuAssertType type,
-    CuAssertArg *arg1, CuAssertArg *arg2,
+    CuAssertArg const *arg1, CuAssertArg const *arg2,
     char const *file, int line);
 
 /**
