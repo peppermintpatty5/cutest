@@ -68,7 +68,7 @@ typedef enum
 } CuAssertType;
 
 /**
- * Represents an argument passed to an assertion function.
+ * Represents an argument passed to an assertion macro.
  */
 typedef struct
 {
@@ -82,6 +82,14 @@ typedef struct
         int i;
     } value;
 } CuAssertArg;
+
+/**
+ * Stateful timer function pointer that measures time elapsed in seconds.
+ *
+ * If passed a non-zero value, then the timer shall be reset and 0.0 returned.
+ * Otherwise, the time elapsed since the most recent reset shall be returned.
+ */
+typedef float (*timer_fn_t)(int);
 
 /**
  * Create a new test suite.
@@ -115,8 +123,10 @@ extern int cu_do_assertion(
  *
  * If the output stream is not null, then summary information is printed as each
  * test completes.
+ *
+ * If the timer function is not null, then the time elapsed shall be recorded.
  */
-extern void cu_run_tests(CuTestSuite *suite, FILE *out);
+extern void cu_run_tests(CuTestSuite *suite, FILE *out, timer_fn_t timer);
 
 /**
  * Print information about test results to the output stream.

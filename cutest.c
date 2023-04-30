@@ -40,6 +40,7 @@ struct cu_test_suite
     CuTestCase *head;
     CuTestCase *tail;
     int completed;
+    float time_elapsed;
 };
 
 /**
@@ -153,9 +154,13 @@ int cu_do_assertion(
     return result;
 }
 
-void cu_run_tests(CuTestSuite *suite, FILE *out)
+void cu_run_tests(CuTestSuite *suite, FILE *out, timer_fn_t timer)
 {
     CuTestCase *tc;
+
+    /* start timer */
+    if (timer != NULL)
+        timer(1);
 
     for (tc = suite->head; tc != NULL; tc = tc->next)
     {
@@ -163,10 +168,10 @@ void cu_run_tests(CuTestSuite *suite, FILE *out)
         if (out != NULL)
             fputc(tc->failed ? 'F' : '.', out);
     }
-
     if (out != NULL)
         fputc('\n', out);
 
+    suite->time_elapsed = timer != NULL ? timer(0) : 0.0f;
     suite->completed = 1;
 }
 
@@ -251,7 +256,8 @@ void cu_print_results(CuTestSuite *suite, FILE *out)
         }
 
         print_row(out, '-', RESULTS_BORDER_LENGTH);
-        fprintf(out, "Ran %u test%s\n\n", num_tests, num_tests != 1 ? "s" : "");
+        fprintf(out, "Ran %u test%s in %.3fs\n\n",
+                num_tests, num_tests != 1 ? "s" : "", suite->time_elapsed);
         if (failures > 0)
             fprintf(out, "FAILED (failures=%u)\n", failures);
         else
