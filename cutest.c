@@ -5,6 +5,8 @@
 
 #include "cutest.h"
 
+#define RESULTS_BORDER_LENGTH 70U
+
 /**
  * Maps CuAssertType to corresponding macro suffix string.
  */
@@ -39,6 +41,18 @@ struct cu_test_suite
     CuTestCase *tail;
     int completed;
 };
+
+/**
+ * Print character to output stream repeatedly followed by a newline.
+ */
+static void print_row(FILE *out, char c, unsigned n)
+{
+    unsigned i;
+
+    for (i = 0; i < n; i++)
+        fputc(c, out);
+    fputc('\n', out);
+}
 
 CuTestSuite *cu_new_test_suite(void)
 {
@@ -139,14 +153,19 @@ int cu_do_assertion(
     return result;
 }
 
-void cu_run_tests(CuTestSuite *suite)
+void cu_run_tests(CuTestSuite *suite, FILE *out)
 {
     CuTestCase *tc;
 
     for (tc = suite->head; tc != NULL; tc = tc->next)
     {
         tc->func(tc);
+        if (out != NULL)
+            fputc(tc->failed ? 'F' : '.', out);
     }
+
+    if (out != NULL)
+        fputc('\n', out);
 
     suite->completed = 1;
 }
@@ -156,9 +175,12 @@ void cu_print_results(CuTestSuite *suite, FILE *out)
     if (suite->completed)
     {
         CuTestCase *tc;
+        unsigned num_tests = 0, failures = 0;
 
         for (tc = suite->head; tc != NULL; tc = tc->next)
         {
+            num_tests++;
+
             if (tc->failed)
             {
                 struct fail_info const *info = &tc->fail_info;
@@ -166,56 +188,73 @@ void cu_print_results(CuTestSuite *suite, FILE *out)
                 CuAssertArg const *arg1 = &info->arg1,
                                   *arg2 = &info->arg2;
 
-                fprintf(out, "FAIL: %s, %s:%d\n", tc->name, info->file, info->line);
+                failures++;
 
+                print_row(out, '=', RESULTS_BORDER_LENGTH);
+                fprintf(out, "FAIL: %s\n", tc->name);
+                print_row(out, '-', RESULTS_BORDER_LENGTH);
+
+                fprintf(out, "%s:%d:\n\t", info->file, info->line);
                 switch (info->type)
                 {
                 case CU_ASSERT_EQUAL:
                 case CU_ASSERT_NOT_EQUAL:
                 case CU_ASSERT_STR_EQUAL:
                 case CU_ASSERT_STR_NOT_EQUAL:
-                    fprintf(out, "\tAssert%s(%s, %s)\n", suffix, arg1->expr, arg2->expr);
+                    fprintf(out, "Assert%s(%s, %s)\n",
+                            suffix, arg1->expr, arg2->expr);
                     break;
                 case CU_ASSERT_TRUE:
                 case CU_ASSERT_FALSE:
                 case CU_ASSERT_NULL:
                 case CU_ASSERT_NOT_NULL:
-                    fprintf(out, "\tAssert%s(%s)\n", suffix, arg1->expr);
+                    fprintf(out, "Assert%s(%s)\n",
+                            suffix, arg1->expr);
                     break;
                 default:
                     break;
                 }
 
+                fprintf(out, "Error:\n\t");
                 switch (info->type)
                 {
                 case CU_ASSERT_EQUAL:
-                    fprintf(out, "\t%d != %d\n", arg1->value.i, arg2->value.i);
+                    fprintf(out, "%d != %d\n", arg1->value.i, arg2->value.i);
                     break;
                 case CU_ASSERT_NOT_EQUAL:
-                    fprintf(out, "\t%d == %d\n", arg1->value.i, arg2->value.i);
+                    fprintf(out, "%d == %d\n", arg1->value.i, arg2->value.i);
                     break;
                 case CU_ASSERT_STR_EQUAL:
-                    fprintf(out, "\t%s != %s\n", arg1->value.s, arg2->value.s);
+                    fprintf(out, "%s != %s\n", arg1->value.s, arg2->value.s);
                     break;
                 case CU_ASSERT_STR_NOT_EQUAL:
-                    fprintf(out, "\t%s == %s\n", arg1->value.s, arg2->value.s);
+                    fprintf(out, "%s == %s\n", arg1->value.s, arg2->value.s);
                     break;
                 case CU_ASSERT_TRUE:
-                    fprintf(out, "\t%d is not true\n", arg1->value.i);
+                    fprintf(out, "%d is not true\n", arg1->value.i);
                     break;
                 case CU_ASSERT_FALSE:
-                    fprintf(out, "\t%d is not false\n", arg1->value.i);
+                    fprintf(out, "%d is not false\n", arg1->value.i);
                     break;
                 case CU_ASSERT_NULL:
-                    fprintf(out, "\t%p is not null\n", arg1->value.p);
+                    fprintf(out, "%p is not null\n", arg1->value.p);
                     break;
                 case CU_ASSERT_NOT_NULL:
-                    fprintf(out, "\t%p is null\n", arg1->value.p);
+                    fprintf(out, "%p is null\n", arg1->value.p);
                     break;
                 default:
                     break;
                 }
+
+                fputc('\n', out);
             }
         }
+
+        print_row(out, '-', RESULTS_BORDER_LENGTH);
+        fprintf(out, "Ran %u test%s\n\n", num_tests, num_tests != 1 ? "s" : "");
+        if (failures > 0)
+            fprintf(out, "FAILED (failures=%u)\n", failures);
+        else
+            fprintf(out, "OK\n");
     }
 }

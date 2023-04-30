@@ -38,7 +38,8 @@ int main(void)
     AddTestCase(suite, my_other_test);
     AddTestCase(suite, test_null);
     AddTestCase(suite, test_str);
-    cu_run_tests(suite);
+
+    cu_run_tests(suite, stderr);
     cu_print_results(suite, stderr);
 
     return EXIT_SUCCESS;

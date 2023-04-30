@@ -91,7 +91,8 @@ extern CuTestSuite *cu_new_test_suite(void);
 /**
  * Create a new test case using the given function.
  */
-extern CuTestCase *cu_new_test_case(void (*func)(CuTestCase *), char const *name);
+extern CuTestCase *cu_new_test_case(
+    void (*func)(CuTestCase *), char const *name);
 
 /**
  * Add test case to test suite.
@@ -111,8 +112,11 @@ extern int cu_do_assertion(
 
 /**
  * Run all tests in the test suite.
+ *
+ * If the output stream is not null, then summary information is printed as each
+ * test completes.
  */
-extern void cu_run_tests(CuTestSuite *suite);
+extern void cu_run_tests(CuTestSuite *suite, FILE *out);
 
 /**
  * Print information about test results to the output stream.
