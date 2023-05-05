@@ -20,6 +20,37 @@ static char const *const assert_type_suffixes[] = {
     "Null",
     "NotNull"};
 
+/**
+ * Represents an argument passed to an assertion macro.
+ */
+typedef struct
+{
+    /* The argument's original string representation */
+    char const *expr;
+    /* The argument's actual value */
+    union cu_value
+    {
+        void const *p;
+        char const *s;
+        int i;
+    } value;
+} CuAssertArg;
+
+/**
+ * All possible assertion types.
+ */
+typedef enum
+{
+    ASSERT_EQUAL,
+    ASSERT_NOT_EQUAL,
+    ASSERT_STR_EQUAL,
+    ASSERT_STR_NOT_EQUAL,
+    ASSERT_TRUE,
+    ASSERT_FALSE,
+    ASSERT_NULL,
+    ASSERT_NOT_NULL
+} CuAssertType;
+
 struct cu_test_case
 {
     CuTestCase *next;
@@ -90,70 +121,6 @@ void cu_add_test(CuTestSuite *suite, CuTestCase *tc)
     suite->tail = tc;
 }
 
-int cu_do_assertion(
-    CuTestCase *tc, CuAssertType type,
-    CuAssertArg const *arg1, CuAssertArg const *arg2,
-    char const *file, int line)
-{
-    int result;
-
-    switch (type)
-    {
-    case CU_ASSERT_EQUAL:
-        result = arg1->value.i == arg2->value.i;
-        break;
-    case CU_ASSERT_NOT_EQUAL:
-        result = arg1->value.i != arg2->value.i;
-        break;
-    case CU_ASSERT_STR_EQUAL:
-        result = strcmp(arg1->value.s, arg2->value.s) == 0;
-        break;
-    case CU_ASSERT_STR_NOT_EQUAL:
-        result = strcmp(arg1->value.s, arg2->value.s) != 0;
-        break;
-    case CU_ASSERT_TRUE:
-        result = arg1->value.i;
-        break;
-    case CU_ASSERT_FALSE:
-        result = !arg1->value.i;
-        break;
-    case CU_ASSERT_NULL:
-        result = arg1->value.p == NULL;
-        break;
-    case CU_ASSERT_NOT_NULL:
-        result = arg1->value.p != NULL;
-        break;
-    default:
-        break;
-    }
-
-    if (!result)
-    {
-        struct fail_info *info = &tc->fail_info;
-
-        info->arg1 = *arg1;
-        info->arg2 = *arg2;
-        info->file = file;
-        info->line = line;
-        info->type = type;
-        tc->failed = 1;
-
-        /* string values must be copied */
-        if (type == CU_ASSERT_STR_EQUAL || type == CU_ASSERT_STR_NOT_EQUAL)
-        {
-            char *str1, *str2;
-
-            str1 = malloc(strlen(arg1->value.s) + 1);
-            str2 = malloc(strlen(arg2->value.s) + 1);
-
-            info->arg1.value.s = strcpy(str1, arg1->value.s);
-            info->arg2.value.s = strcpy(str2, arg2->value.s);
-        }
-    }
-
-    return result;
-}
-
 void cu_run_tests(CuTestSuite *suite, FILE *out, timer_fn_t timer)
 {
     CuTestCase *tc;
@@ -202,17 +169,17 @@ void cu_print_results(CuTestSuite *suite, FILE *out)
                 fprintf(out, "%s:%d:\n\t", info->file, info->line);
                 switch (info->type)
                 {
-                case CU_ASSERT_EQUAL:
-                case CU_ASSERT_NOT_EQUAL:
-                case CU_ASSERT_STR_EQUAL:
-                case CU_ASSERT_STR_NOT_EQUAL:
+                case ASSERT_EQUAL:
+                case ASSERT_NOT_EQUAL:
+                case ASSERT_STR_EQUAL:
+                case ASSERT_STR_NOT_EQUAL:
                     fprintf(out, "Assert%s(%s, %s)\n",
                             suffix, arg1->expr, arg2->expr);
                     break;
-                case CU_ASSERT_TRUE:
-                case CU_ASSERT_FALSE:
-                case CU_ASSERT_NULL:
-                case CU_ASSERT_NOT_NULL:
+                case ASSERT_TRUE:
+                case ASSERT_FALSE:
+                case ASSERT_NULL:
+                case ASSERT_NOT_NULL:
                     fprintf(out, "Assert%s(%s)\n",
                             suffix, arg1->expr);
                     break;
@@ -223,28 +190,28 @@ void cu_print_results(CuTestSuite *suite, FILE *out)
                 fprintf(out, "Error:\n\t");
                 switch (info->type)
                 {
-                case CU_ASSERT_EQUAL:
+                case ASSERT_EQUAL:
                     fprintf(out, "%d != %d\n", arg1->value.i, arg2->value.i);
                     break;
-                case CU_ASSERT_NOT_EQUAL:
+                case ASSERT_NOT_EQUAL:
                     fprintf(out, "%d == %d\n", arg1->value.i, arg2->value.i);
                     break;
-                case CU_ASSERT_STR_EQUAL:
+                case ASSERT_STR_EQUAL:
                     fprintf(out, "%s != %s\n", arg1->value.s, arg2->value.s);
                     break;
-                case CU_ASSERT_STR_NOT_EQUAL:
+                case ASSERT_STR_NOT_EQUAL:
                     fprintf(out, "%s == %s\n", arg1->value.s, arg2->value.s);
                     break;
-                case CU_ASSERT_TRUE:
+                case ASSERT_TRUE:
                     fprintf(out, "%d is not true\n", arg1->value.i);
                     break;
-                case CU_ASSERT_FALSE:
+                case ASSERT_FALSE:
                     fprintf(out, "%d is not false\n", arg1->value.i);
                     break;
-                case CU_ASSERT_NULL:
+                case ASSERT_NULL:
                     fprintf(out, "%p is not null\n", arg1->value.p);
                     break;
-                case CU_ASSERT_NOT_NULL:
+                case ASSERT_NOT_NULL:
                     fprintf(out, "%p is null\n", arg1->value.p);
                     break;
                 default:
@@ -263,4 +230,70 @@ void cu_print_results(CuTestSuite *suite, FILE *out)
         else
             fprintf(out, "OK\n");
     }
+}
+
+int cu_assert_equal(CuTestCase *tc, int i1, int i2, int negate)
+{
+    int result = negate ? i1 != i2 : i1 == i2;
+
+    if (!result)
+    {
+        tc->fail_info.arg1.value.i = i1;
+        tc->fail_info.arg2.value.i = i2;
+        tc->fail_info.type = negate ? ASSERT_NOT_EQUAL : ASSERT_EQUAL;
+    }
+
+    return result;
+}
+
+int cu_assert_str_equal(
+    CuTestCase *tc, char const *s1, char const *s2, int negate)
+{
+    int result = negate ? strcmp(s1, s2) != 0 : strcmp(s1, s2) == 0;
+
+    if (!result)
+    {
+        tc->fail_info.arg1.value.s = strcpy(malloc(strlen(s1) + 1), s1);
+        tc->fail_info.arg2.value.s = strcpy(malloc(strlen(s2) + 1), s2);
+        tc->fail_info.type = negate ? ASSERT_STR_NOT_EQUAL : ASSERT_STR_EQUAL;
+    }
+
+    return result;
+}
+
+int cu_assert_true(CuTestCase *tc, int b, int negate)
+{
+    int result = negate ? !b : b;
+
+    if (!result)
+    {
+        tc->fail_info.arg1.value.i = b;
+        tc->fail_info.type = negate ? ASSERT_FALSE : ASSERT_TRUE;
+    }
+
+    return result;
+}
+
+int cu_assert_null(CuTestCase *tc, void const *p, int negate)
+{
+    int result = negate ? p != NULL : p == NULL;
+
+    if (!result)
+    {
+        tc->fail_info.arg1.value.p = p;
+        tc->fail_info.type = negate ? ASSERT_NOT_NULL : ASSERT_NULL;
+    }
+
+    return result;
+}
+
+void cu_set_failed(
+    CuTestCase *tc, char const *file, int line,
+    char const *expr1, char const *expr2)
+{
+    tc->fail_info.arg1.expr = expr1;
+    tc->fail_info.arg2.expr = expr2;
+    tc->fail_info.file = file;
+    tc->fail_info.line = line;
+    tc->failed = 1;
 }

@@ -32,19 +32,3 @@ Measuring time in milliseconds is not portable in C. Therefore, measuring time e
  */
 typedef float (*timer_fn_t)(int);
 ```
-
-## Bugs
-
-This project uses a lot of macros. If you wanted to break things, you could do so by using assignment to mess with variables declared inside the macro. For example:
-
-```c
-#include "cutest.h"
-
-/**
- * This test will fail because the first argument has been changed from 4 to 6.
- */
-static void broken_test(CuTestCase *tc)
-{
-    AssertNotEqual(tc, 2 + 2, arg1.value.i = 6);
-}
-```

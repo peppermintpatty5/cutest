@@ -6,41 +6,39 @@
 #define AddTestCase(suite, func) \
     cu_add_test(suite, cu_new_test_case(func, #func))
 
+#define FailFast(tc, cond, expr1, expr2)                         \
+    do                                                           \
+    {                                                            \
+        if (!(cond))                                             \
+        {                                                        \
+            cu_set_failed(tc, __FILE__, __LINE__, expr1, expr2); \
+            return;                                              \
+        }                                                        \
+    } while (0)
+
 #define AssertEqual(tc, first, second) \
-    CuAssert(tc, CU_ASSERT_EQUAL, first, second, i)
+    FailFast(tc, cu_assert_equal(tc, first, second, 0), #first, #second)
 
 #define AssertNotEqual(tc, first, second) \
-    CuAssert(tc, CU_ASSERT_NOT_EQUAL, first, second, i)
+    FailFast(tc, cu_assert_equal(tc, first, second, 1), #first, #second)
 
 #define AssertStrEqual(tc, first, second) \
-    CuAssert(tc, CU_ASSERT_STR_EQUAL, first, second, s)
+    FailFast(tc, cu_assert_str_equal(tc, first, second, 0), #first, #second)
 
 #define AssertStrNotEqual(tc, first, second) \
-    CuAssert(tc, CU_ASSERT_STR_NOT_EQUAL, first, second, s)
+    FailFast(tc, cu_assert_str_equal(tc, first, second, 1), #first, #second)
 
 #define AssertTrue(tc, expr) \
-    CuAssert(tc, CU_ASSERT_TRUE, expr, 0, i)
+    FailFast(tc, cu_assert_true(tc, expr, 0), #expr, NULL)
 
 #define AssertFalse(tc, expr) \
-    CuAssert(tc, CU_ASSERT_FALSE, expr, 0, i)
+    FailFast(tc, cu_assert_true(tc, expr, 1), #expr, NULL)
 
 #define AssertNull(tc, ptr) \
-    CuAssert(tc, CU_ASSERT_NULL, ptr, 0, p)
+    FailFast(tc, cu_assert_null(tc, ptr, 0), #ptr, NULL)
 
 #define AssertNotNull(tc, ptr) \
-    CuAssert(tc, CU_ASSERT_NOT_NULL, ptr, 0, p)
-
-#define CuAssert(tc, type, expr1, expr2, X)                               \
-    do                                                                    \
-    {                                                                     \
-        CuAssertArg arg1, arg2;                                           \
-        arg1.expr = #expr1;                                               \
-        arg2.expr = #expr2;                                               \
-        arg1.value.X = expr1;                                             \
-        arg2.value.X = expr2;                                             \
-        if (!cu_do_assertion(tc, type, &arg1, &arg2, __FILE__, __LINE__)) \
-            return;                                                       \
-    } while (0)
+    FailFast(tc, cu_assert_null(tc, ptr, 1), #ptr, NULL)
 
 /**
  * A single test case.
@@ -51,37 +49,6 @@ typedef struct cu_test_case CuTestCase;
  * A series of test cases.
  */
 typedef struct cu_test_suite CuTestSuite;
-
-/**
- * All possible assertion types.
- */
-typedef enum
-{
-    CU_ASSERT_EQUAL,
-    CU_ASSERT_NOT_EQUAL,
-    CU_ASSERT_STR_EQUAL,
-    CU_ASSERT_STR_NOT_EQUAL,
-    CU_ASSERT_TRUE,
-    CU_ASSERT_FALSE,
-    CU_ASSERT_NULL,
-    CU_ASSERT_NOT_NULL
-} CuAssertType;
-
-/**
- * Represents an argument passed to an assertion macro.
- */
-typedef struct
-{
-    /* The argument's original string representation */
-    char const *expr;
-    /* The argument's actual value */
-    union cu_value
-    {
-        void const *p;
-        char const *s;
-        int i;
-    } value;
-} CuAssertArg;
 
 /**
  * Stateful timer function pointer that measures time elapsed in seconds.
@@ -108,17 +75,6 @@ extern CuTestCase *cu_new_test_case(
 extern void cu_add_test(CuTestSuite *suite, CuTestCase *tc);
 
 /**
- * Perform the assertion check.
- *
- * If the assertion fails, then the test case is updated as such and 0 is
- * returned.
- */
-extern int cu_do_assertion(
-    CuTestCase *tc, CuAssertType type,
-    CuAssertArg const *arg1, CuAssertArg const *arg2,
-    char const *file, int line);
-
-/**
  * Run all tests in the test suite.
  *
  * If the output stream is not null, then summary information is printed as each
@@ -132,5 +88,18 @@ extern void cu_run_tests(CuTestSuite *suite, FILE *out, timer_fn_t timer);
  * Print information about test results to the output stream.
  */
 extern void cu_print_results(CuTestSuite *suite, FILE *out);
+
+extern int cu_assert_equal(CuTestCase *tc, int i1, int i2, int negate);
+
+extern int cu_assert_str_equal(
+    CuTestCase *tc, char const *s1, char const *s2, int negate);
+
+extern int cu_assert_true(CuTestCase *tc, int b, int negate);
+
+extern int cu_assert_null(CuTestCase *tc, void const *p, int negate);
+
+extern void cu_set_failed(
+    CuTestCase *tc, char const *file, int line,
+    char const *expr1, char const *expr2);
 
 #endif
