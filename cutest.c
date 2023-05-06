@@ -1,10 +1,10 @@
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "cutest.h"
 
+#define MAX_ASSERT_ARGS 2
 #define RESULTS_BORDER_LENGTH 70U
 
 /**
@@ -23,23 +23,21 @@ static char const *const assert_type_suffixes[] = {
 /**
  * Represents an argument passed to an assertion macro.
  */
-typedef struct
+struct assert_arg
 {
-    /* The argument's original string representation */
-    char const *expr;
-    /* The argument's actual value */
-    union cu_value
+    char const *expr; /* Argument's original string representation */
+    union             /* Argument's actual value */
     {
         void const *p;
         char const *s;
         int i;
     } value;
-} CuAssertArg;
+};
 
 /**
  * All possible assertion types.
  */
-typedef enum
+enum assert_type
 {
     ASSERT_EQUAL,
     ASSERT_NOT_EQUAL,
@@ -49,29 +47,35 @@ typedef enum
     ASSERT_FALSE,
     ASSERT_NULL,
     ASSERT_NOT_NULL
-} CuAssertType;
+};
+
+/**
+ * Records information about a failed assertion.
+ */
+struct fail_info
+{
+    struct assert_arg args[MAX_ASSERT_ARGS]; /* Arguments passed to assertion */
+    char const *file;                        /* Name of file */
+    int line;                                /* Line number */
+    enum assert_type type;                   /* Type of assertion */
+};
 
 struct cu_test_case
 {
-    CuTestCase *next;
-    void (*func)(CuTestCase *);
-    char const *name;
-    struct fail_info
-    {
-        CuAssertArg arg1, arg2;
-        char const *file;
-        int line;
-        CuAssertType type;
-    } fail_info;
-    int failed;
+    CuTestCase *next;           /* Next test case */
+    void (*func)(CuTestCase *); /* Function associated with this test case */
+    char const *name;           /* Name of function */
+    struct fail_info fail_info; /* Failure information (only if failed) */
+    int failed;                 /* Non-zero if failure occurred */
 };
 
 struct cu_test_suite
 {
-    CuTestCase *head;
-    CuTestCase *tail;
-    int completed;
-    float time_elapsed;
+    CuTestCase *head;   /* First test case */
+    CuTestCase *tail;   /* Last test case */
+    unsigned num_cases; /* Number of test cases */
+    int completed;      /* Non-zero if ran at least once */
+    float time_elapsed; /* Time elapsed of last recorded run */
 };
 
 /**
@@ -92,11 +96,15 @@ CuTestSuite *cu_new_test_suite(void)
 
     suite->head = NULL;
     suite->tail = NULL;
+    suite->num_cases = 0;
+    suite->completed = 0;
+    suite->time_elapsed = 0.0f;
 
     return suite;
 }
 
-CuTestCase *cu_new_test_case(void (*func)(CuTestCase *), char const *name)
+void cu_add_test_case(
+    CuTestSuite *suite, void (*func)(CuTestCase *), char const *name)
 {
     CuTestCase *tc = malloc(sizeof(CuTestCase));
 
@@ -104,14 +112,6 @@ CuTestCase *cu_new_test_case(void (*func)(CuTestCase *), char const *name)
     tc->func = func;
     tc->name = name;
     tc->failed = 0;
-
-    return tc;
-}
-
-void cu_add_test(CuTestSuite *suite, CuTestCase *tc)
-{
-    assert(suite != NULL);
-    assert(tc != NULL);
 
     if (suite->tail != NULL)
         suite->tail->next = tc;
@@ -147,18 +147,16 @@ void cu_print_results(CuTestSuite *suite, FILE *out)
     if (suite->completed)
     {
         CuTestCase *tc;
-        unsigned num_tests = 0, failures = 0;
+        unsigned failures = 0;
 
         for (tc = suite->head; tc != NULL; tc = tc->next)
         {
-            num_tests++;
-
             if (tc->failed)
             {
                 struct fail_info const *info = &tc->fail_info;
+                struct assert_arg const *arg1 = &info->args[0],
+                                        *arg2 = &info->args[1];
                 char const *suffix = assert_type_suffixes[info->type];
-                CuAssertArg const *arg1 = &info->arg1,
-                                  *arg2 = &info->arg2;
 
                 failures++;
 
@@ -224,7 +222,9 @@ void cu_print_results(CuTestSuite *suite, FILE *out)
 
         print_row(out, '-', RESULTS_BORDER_LENGTH);
         fprintf(out, "Ran %u test%s in %.3fs\n\n",
-                num_tests, num_tests != 1 ? "s" : "", suite->time_elapsed);
+                suite->num_cases,
+                suite->num_cases != 1 ? "s" : "",
+                suite->time_elapsed);
         if (failures > 0)
             fprintf(out, "FAILED (failures=%u)\n", failures);
         else
@@ -238,8 +238,8 @@ int cu_assert_equal(CuTestCase *tc, int i1, int i2, int negate)
 
     if (!result)
     {
-        tc->fail_info.arg1.value.i = i1;
-        tc->fail_info.arg2.value.i = i2;
+        tc->fail_info.args[0].value.i = i1;
+        tc->fail_info.args[1].value.i = i2;
         tc->fail_info.type = negate ? ASSERT_NOT_EQUAL : ASSERT_EQUAL;
     }
 
@@ -253,8 +253,8 @@ int cu_assert_str_equal(
 
     if (!result)
     {
-        tc->fail_info.arg1.value.s = strcpy(malloc(strlen(s1) + 1), s1);
-        tc->fail_info.arg2.value.s = strcpy(malloc(strlen(s2) + 1), s2);
+        tc->fail_info.args[0].value.s = strcpy(malloc(strlen(s1) + 1), s1);
+        tc->fail_info.args[1].value.s = strcpy(malloc(strlen(s2) + 1), s2);
         tc->fail_info.type = negate ? ASSERT_STR_NOT_EQUAL : ASSERT_STR_EQUAL;
     }
 
@@ -267,7 +267,7 @@ int cu_assert_true(CuTestCase *tc, int b, int negate)
 
     if (!result)
     {
-        tc->fail_info.arg1.value.i = b;
+        tc->fail_info.args[0].value.i = b;
         tc->fail_info.type = negate ? ASSERT_FALSE : ASSERT_TRUE;
     }
 
@@ -280,7 +280,7 @@ int cu_assert_null(CuTestCase *tc, void const *p, int negate)
 
     if (!result)
     {
-        tc->fail_info.arg1.value.p = p;
+        tc->fail_info.args[0].value.p = p;
         tc->fail_info.type = negate ? ASSERT_NOT_NULL : ASSERT_NULL;
     }
 
@@ -291,8 +291,8 @@ void cu_set_failed(
     CuTestCase *tc, char const *file, int line,
     char const *expr1, char const *expr2)
 {
-    tc->fail_info.arg1.expr = expr1;
-    tc->fail_info.arg2.expr = expr2;
+    tc->fail_info.args[0].expr = expr1;
+    tc->fail_info.args[1].expr = expr2;
     tc->fail_info.file = file;
     tc->fail_info.line = line;
     tc->failed = 1;

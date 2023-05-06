@@ -3,8 +3,15 @@
 
 #include <stdio.h>
 
-#define AddTestCase(suite, func) \
-    cu_add_test(suite, cu_new_test_case(func, #func))
+/**
+ * Create a new test suite.
+ */
+#define NewTestSuite() cu_new_test_suite()
+
+/**
+ * Add a test case to the test suite using the given function.
+ */
+#define AddTestCase(suite, func) cu_add_test_case(suite, func, #func)
 
 #define FailFast(tc, cond, expr1, expr2)                         \
     do                                                           \
@@ -58,21 +65,10 @@ typedef struct cu_test_suite CuTestSuite;
  */
 typedef float (*timer_fn_t)(int);
 
-/**
- * Create a new test suite.
- */
 extern CuTestSuite *cu_new_test_suite(void);
 
-/**
- * Create a new test case using the given function.
- */
-extern CuTestCase *cu_new_test_case(
-    void (*func)(CuTestCase *), char const *name);
-
-/**
- * Add test case to test suite.
- */
-extern void cu_add_test(CuTestSuite *suite, CuTestCase *tc);
+extern void cu_add_test_case(
+    CuTestSuite *suite, void (*func)(CuTestCase *), char const *name);
 
 /**
  * Run all tests in the test suite.

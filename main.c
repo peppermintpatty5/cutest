@@ -58,7 +58,7 @@ static float timer(int reset)
 
 int main(void)
 {
-    CuTestSuite *suite = cu_new_test_suite();
+    CuTestSuite *suite = NewTestSuite();
 
     AddTestCase(suite, my_test);
     AddTestCase(suite, my_other_test);
