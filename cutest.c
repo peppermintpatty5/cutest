@@ -71,19 +71,20 @@ struct cu_test_case
 
 struct cu_test_suite
 {
-    CuTestCase *head;   /* First test case */
-    CuTestCase *tail;   /* Last test case */
-    unsigned num_cases; /* Number of test cases */
-    int completed;      /* Non-zero if ran at least once */
-    float time_elapsed; /* Time elapsed of last recorded run */
+    CuTestCase *head;          /* First test case */
+    CuTestCase *tail;          /* Last test case */
+    unsigned int num_cases;    /* Total number of test cases */
+    unsigned int num_complete; /* Number of test cases ran */
+    unsigned int num_failed;   /* Number of failed test cases */
+    float time_elapsed;        /* Time elapsed of last recorded run */
 };
 
 /**
  * Print character to output stream repeatedly followed by a newline.
  */
-static void print_row(FILE *out, char c, unsigned n)
+static void print_row(FILE *out, char c, unsigned int n)
 {
-    unsigned i;
+    unsigned int i;
 
     for (i = 0; i < n; i++)
         fputc(c, out);
@@ -97,7 +98,6 @@ CuTestSuite *cu_new_test_suite(void)
     suite->head = NULL;
     suite->tail = NULL;
     suite->num_cases = 0;
-    suite->completed = 0;
     suite->time_elapsed = 0.0f;
 
     return suite;
@@ -108,20 +108,23 @@ void cu_add_test_case(
 {
     CuTestCase *tc = malloc(sizeof(CuTestCase));
 
+    /* initialize test case */
     tc->next = NULL;
     tc->func = func;
     tc->name = name;
     tc->failed = 0;
 
+    /* add test case to list */
     if (suite->tail != NULL)
         suite->tail->next = tc;
     else
         suite->head = tc;
 
     suite->tail = tc;
+    suite->num_cases++;
 }
 
-void cu_run_tests(CuTestSuite *suite, FILE *out, timer_fn_t timer)
+unsigned int cu_run_tests(CuTestSuite *suite, FILE *out, timer_fn_t timer)
 {
     CuTestCase *tc;
 
@@ -129,25 +132,32 @@ void cu_run_tests(CuTestSuite *suite, FILE *out, timer_fn_t timer)
     if (timer != NULL)
         timer(1);
 
+    suite->num_complete = 0;
     for (tc = suite->head; tc != NULL; tc = tc->next)
     {
         tc->func(tc);
+
+        if (tc->failed)
+            suite->num_failed++;
+
         if (out != NULL)
             fputc(tc->failed ? 'F' : '.', out);
+
+        suite->num_complete++;
     }
     if (out != NULL)
         fputc('\n', out);
 
     suite->time_elapsed = timer != NULL ? timer(0) : 0.0f;
-    suite->completed = 1;
+
+    return suite->num_failed;
 }
 
-void cu_print_results(CuTestSuite *suite, FILE *out)
+void cu_print_results(CuTestSuite const *suite, FILE *out)
 {
-    if (suite->completed)
+    if (suite->num_complete == suite->num_cases)
     {
         CuTestCase *tc;
-        unsigned failures = 0;
 
         for (tc = suite->head; tc != NULL; tc = tc->next)
         {
@@ -157,8 +167,6 @@ void cu_print_results(CuTestSuite *suite, FILE *out)
                 struct assert_arg const *arg1 = &info->args[0],
                                         *arg2 = &info->args[1];
                 char const *suffix = assert_type_suffixes[info->type];
-
-                failures++;
 
                 print_row(out, '=', RESULTS_BORDER_LENGTH);
                 fprintf(out, "FAIL: %s\n", tc->name);
@@ -225,8 +233,8 @@ void cu_print_results(CuTestSuite *suite, FILE *out)
                 suite->num_cases,
                 suite->num_cases != 1 ? "s" : "",
                 suite->time_elapsed);
-        if (failures > 0)
-            fprintf(out, "FAILED (failures=%u)\n", failures);
+        if (suite->num_failed > 0)
+            fprintf(out, "FAILED (failures=%u)\n", suite->num_failed);
         else
             fprintf(out, "OK\n");
     }

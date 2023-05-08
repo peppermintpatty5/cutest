@@ -71,19 +71,20 @@ extern void cu_add_test_case(
     CuTestSuite *suite, void (*func)(CuTestCase *), char const *name);
 
 /**
- * Run all tests in the test suite.
+ * Run all tests in the test suite and return the number of failures.
  *
  * If the output stream is not null, then summary information is printed as each
  * test completes.
  *
  * If the timer function is not null, then the time elapsed shall be recorded.
  */
-extern void cu_run_tests(CuTestSuite *suite, FILE *out, timer_fn_t timer);
+extern unsigned int cu_run_tests(
+    CuTestSuite *suite, FILE *out, timer_fn_t timer);
 
 /**
  * Print information about test results to the output stream.
  */
-extern void cu_print_results(CuTestSuite *suite, FILE *out);
+extern void cu_print_results(CuTestSuite const *suite, FILE *out);
 
 extern int cu_assert_equal(CuTestCase *tc, int i1, int i2, int negate);
 

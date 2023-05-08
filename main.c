@@ -58,6 +58,7 @@ static float timer(int reset)
 
 int main(void)
 {
+    unsigned int num_failed;
     CuTestSuite *suite = NewTestSuite();
 
     AddTestCase(suite, my_test);
@@ -66,8 +67,8 @@ int main(void)
     AddTestCase(suite, test_str);
     AddTestCase(suite, test_sleep);
 
-    cu_run_tests(suite, stderr, timer);
+    num_failed = cu_run_tests(suite, stderr, timer);
     cu_print_results(suite, stderr);
 
-    return EXIT_SUCCESS;
+    return num_failed == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
